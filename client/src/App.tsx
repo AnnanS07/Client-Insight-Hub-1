@@ -8,6 +8,7 @@ import LoginPage from "@/pages/auth/login";
 import DashboardPage from "@/pages/dashboard";
 import ClientsPage from "@/pages/clients";
 import ClientDetailPage from "@/pages/clients/client-detail";
+import ClientReportPage from "@/pages/clients/report";
 import TasksPage from "@/pages/tasks";
 import NotFound from "@/pages/not-found";
 import Layout from "@/components/layout/layout";
@@ -39,6 +40,12 @@ function Router() {
       
       <Route path="/clients">
         <PrivateRoute component={ClientsPage} />
+      </Route>
+
+      <Route path="/clients/:id/report">
+        {(params) => (
+             <ClientReportPage id={params.id} />
+        )}
       </Route>
 
       <Route path="/clients/:id">

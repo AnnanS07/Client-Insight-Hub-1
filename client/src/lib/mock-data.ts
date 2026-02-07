@@ -50,6 +50,11 @@ export interface Folio {
   notes: string;
 }
 
+export interface PriceHistory {
+    date: string;
+    value: number; // Price per unit or NAV
+}
+
 export interface Holding {
   id: string;
   clientId: string;
@@ -57,15 +62,10 @@ export interface Holding {
   name: string; // Stock name, Fund name, etc.
   purchaseDate: string;
   units: number;
-  costPrice: number; // Cost per unit or total cost? Usually cost per unit or total investment. Let's assume Total Cost for simplicity in data entry or cost per unit. Let's do Total Cost for simplicity given the "manual" nature.
-  // wait, standard is units * avg cost. Let's ask for "Invested Amount" (Cost) and "Current Value" (derived from Price * Units).
-  // Request says: "store purchase date, units/quantity, cost, current NAV/price, and notes"
-  cost: number; // Total invested amount or price per unit? "cost" usually implies total cost basis or unit cost. Let's treat it as Total Invested Amount for simplicity, OR unit cost. Let's stick to "Cost Per Unit" to calculate total.
-  // Actually, "cost" usually means "Total Cost". But "NAV/Price" is per unit.
-  // Let's store: units, averageCostPerUnit, currentPrice.
-  averageCost: number;
+  averageCost: number; // Cost per unit
   currentPrice: number; // NAV or Price
   notes: string;
+  priceHistory: PriceHistory[]; // History of price updates
 }
 
 export interface Task {
@@ -188,6 +188,7 @@ const INITIAL_HOLDINGS: Holding[] = [
     averageCost: 2400,
     currentPrice: 2800,
     notes: "Long term hold",
+    priceHistory: [{ date: "2023-01-15", value: 2400 }, { date: new Date().toISOString().split('T')[0], value: 2800 }]
   },
   {
     id: "2",
@@ -199,6 +200,7 @@ const INITIAL_HOLDINGS: Holding[] = [
     averageCost: 450,
     currentPrice: 580,
     notes: "SIP",
+    priceHistory: [{ date: "2022-06-10", value: 450 }, { date: new Date().toISOString().split('T')[0], value: 580 }]
   },
   {
     id: "3",
@@ -210,6 +212,7 @@ const INITIAL_HOLDINGS: Holding[] = [
     averageCost: 100000,
     currentPrice: 106000, // Accrued value
     notes: "Emergency fund",
+    priceHistory: [{ date: "2023-05-20", value: 100000 }, { date: new Date().toISOString().split('T')[0], value: 106000 }]
   }
 ];
 
@@ -335,9 +338,16 @@ export const mockDb = {
   getAllHoldings: (): Holding[] => {
       return JSON.parse(localStorage.getItem(STORAGE_KEYS.HOLDINGS) || "[]");
   },
-  addHolding: (holding: Omit<Holding, "id">) => {
+  addHolding: (holding: Omit<Holding, "id" | "priceHistory">) => {
     const holdings: Holding[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.HOLDINGS) || "[]");
-    const newHolding = { ...holding, id: nanoid() };
+    // Initial price history entry
+    const initialPriceHistory: PriceHistory = { date: holding.purchaseDate, value: holding.averageCost }; // Or current price if different
+    
+    const newHolding = { 
+        ...holding, 
+        id: nanoid(),
+        priceHistory: [initialPriceHistory, { date: new Date().toISOString().split('T')[0], value: holding.currentPrice }]
+    };
     localStorage.setItem(STORAGE_KEYS.HOLDINGS, JSON.stringify([...holdings, newHolding]));
     return newHolding;
   },
@@ -345,7 +355,20 @@ export const mockDb = {
     const holdings: Holding[] = mockDb.getAllHoldings();
     const index = holdings.findIndex((h) => h.id === id);
     if (index !== -1) {
-      holdings[index] = { ...holdings[index], ...updates };
+      // If price is updated, record history
+      if (updates.currentPrice !== undefined && updates.currentPrice !== holdings[index].currentPrice) {
+          const newHistory = { date: new Date().toISOString().split('T')[0], value: updates.currentPrice };
+          // Append or update today's price? Append for history trail.
+          // Check if today already exists? Simple demo: just push
+          holdings[index] = { 
+              ...holdings[index], 
+              ...updates,
+              priceHistory: [...(holdings[index].priceHistory || []), newHistory]
+          };
+      } else {
+           holdings[index] = { ...holdings[index], ...updates };
+      }
+      
       localStorage.setItem(STORAGE_KEYS.HOLDINGS, JSON.stringify(holdings));
       return holdings[index];
     }
@@ -395,13 +418,6 @@ export function getPortfolioSummary(holdings: Holding[]) {
         byAssetClass[h.assetClass].invested += invested;
         byAssetClass[h.assetClass].current += current;
     });
-
-    // Approximate weighted CAGR based on individual holdings timeframes? 
-    // Or just simple aggregate return %? User asked for CAGR/XIRR.
-    // Without transaction history, we can only do simple Absolute Return or CAGR based on an "average" age or specific holding ages.
-    // We'll calculate CAGR per holding and then weight it, or just show Absolute Return for total.
-    // Let's stick to Absolute Return for the Summary for now to avoid misleading CAGR without dates.
-    // Actually, we have purchaseDate on holdings.
     
     return {
         totalInvested,
