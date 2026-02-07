@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { mockDb, Client, ClientStatus } from "@/lib/mock-data";
+import { mockDb, Client, ClientStatus, CLIENT_SEGMENTS, ClientSegment } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -60,9 +60,9 @@ export default function ClientsPage() {
   }, [clients, search, statusFilter]);
 
   const handleExportCSV = () => {
-    const headers = ["ID", "Name", "Company", "Email", "Phone", "Status", "Owner", "Last Contact"];
+    const headers = ["ID", "Name", "Company", "Email", "Phone", "Status", "Segment", "Demat ID", "Owner", "Last Contact"];
     const rows = filteredClients.map(c => [
-      c.id, c.name, c.company, c.email, c.phone, c.status, c.owner, c.lastContact
+      c.id, c.name, c.company, c.email, c.phone, c.status, `"${c.segment}"`, c.dematId || "", c.owner, c.lastContact
     ]);
     
     const csvContent = "data:text/csv;charset=utf-8," 
@@ -71,7 +71,7 @@ export default function ClientsPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "clients_export.csv");
+    link.setAttribute("download", "ds_partners_clients.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -85,21 +85,32 @@ export default function ClientsPage() {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       // Very basic CSV parsing for demo
+      // Assuming headers: Name,Company,Email,Phone,Status,Segment,Demat ID
       const lines = text.split("\n").slice(1); // skip header
       lines.forEach(line => {
-        const [id, name, company, email, phone, status, owner] = line.split(",");
-        if (name && email) {
-          mockDb.addClient({
-            name: name.trim(),
-            company: company?.trim() || "",
-            email: email.trim(),
-            phone: phone?.trim() || "",
-            address: "",
-            tags: [],
-            status: (status?.trim() as ClientStatus) || "Lead",
-            owner: owner?.trim() || user?.name || "admin",
-            notes: "Imported from CSV"
-          });
+        // Simple regex to handle quoted CSV fields (like Segment which has commas)
+        const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+        if (!matches) return;
+        
+        // Cleanup quotes
+        const values = matches.map(val => val.replace(/^"|"$/g, '').trim());
+        
+        // Mapping based on assumed CSV structure for demo purposes
+        // Ideally we'd map by header name
+        if (values.length >= 3) {
+             mockDb.addClient({
+                name: values[0] || "Unknown",
+                company: values[1] || "",
+                email: values[2] || "",
+                phone: values[3] || "",
+                address: "",
+                tags: [],
+                status: (values[4] as ClientStatus) || "Lead",
+                segment: (values[5] as ClientSegment) || "Business owner",
+                dematId: values[6] || "",
+                owner: user?.name || "admin",
+                notes: "Imported from CSV"
+            });
         }
       });
       queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -139,7 +150,7 @@ export default function ClientsPage() {
                 Add Client
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>Add New Client</DialogTitle>
                 <DialogDescription>
@@ -186,7 +197,7 @@ export default function ClientsPage() {
               <TableHead>Name</TableHead>
               <TableHead className="hidden md:table-cell">Company</TableHead>
               <TableHead className="hidden md:table-cell">Status</TableHead>
-              <TableHead className="hidden lg:table-cell">Owner</TableHead>
+              <TableHead className="hidden lg:table-cell">Segment</TableHead>
               <TableHead className="hidden lg:table-cell">Last Contact</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -216,7 +227,7 @@ export default function ClientsPage() {
                   <TableCell className="hidden md:table-cell">
                     <StatusBadge status={client.status} />
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">{client.owner}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs">{client.segment}</TableCell>
                   <TableCell className="hidden lg:table-cell text-muted-foreground">
                     {format(new Date(client.lastContact), "MMM d, yyyy")}
                   </TableCell>
@@ -275,6 +286,8 @@ function AddClientForm({ onSubmit, onCancel }: { onSubmit: (data: any) => void, 
     email: "",
     phone: "",
     status: "Lead",
+    segment: CLIENT_SEGMENTS[0] as string,
+    dematId: "",
     owner: "admin"
   });
 
@@ -310,6 +323,25 @@ function AddClientForm({ onSubmit, onCancel }: { onSubmit: (data: any) => void, 
           <Label htmlFor="phone">Phone</Label>
           <Input id="phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="segment">Segment</Label>
+        <Select value={formData.segment} onValueChange={v => setFormData({...formData, segment: v})}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CLIENT_SEGMENTS.map(s => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+         <Label htmlFor="dematId">Demat ID</Label>
+         <Input id="dematId" value={formData.dematId} onChange={e => setFormData({...formData, dematId: e.target.value})} placeholder="Optional single Demat ID" />
       </div>
 
       <div className="space-y-2">

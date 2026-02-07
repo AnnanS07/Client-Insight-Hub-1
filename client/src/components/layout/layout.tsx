@@ -7,7 +7,7 @@ import {
   LogOut,
   Menu,
   X,
-  Building2,
+  Briefcase,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -28,8 +28,8 @@ export function Sidebar({ className }: { className?: string }) {
   return (
     <div className={cn("flex flex-col h-full bg-sidebar border-r border-sidebar-border", className)}>
       <div className="h-16 flex items-center px-6 border-b border-sidebar-border">
-        <Building2 className="w-6 h-6 text-primary mr-2" />
-        <span className="font-bold text-lg tracking-tight text-sidebar-foreground">ClientFlow</span>
+        <Briefcase className="w-6 h-6 text-primary mr-2" />
+        <span className="font-bold text-lg tracking-tight text-sidebar-foreground truncate" title="DS Partners Clients Dashboards">DS Partners</span>
       </div>
 
       <div className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
@@ -89,7 +89,7 @@ export function Header() {
             <Sidebar />
           </SheetContent>
         </Sheet>
-        <span className="font-bold ml-2">ClientFlow</span>
+        <span className="font-bold ml-2 truncate">DS Partners</span>
       </div>
 
       <div className="flex items-center gap-4">

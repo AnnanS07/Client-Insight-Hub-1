@@ -5,11 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Lock } from "lucide-react";
+import { Briefcase, Lock } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [email, setEmail] = useState("admin@clientflow.com");
+  const [email, setEmail] = useState("admin@dspartners.com");
   const [role, setRole] = useState<"admin" | "staff">("admin");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -37,12 +37,12 @@ export default function LoginPage() {
         <CardHeader className="space-y-1 text-center pb-8 pt-8">
           <div className="flex justify-center mb-4">
             <div className="p-3 bg-primary/10 rounded-xl ring-1 ring-primary/20">
-              <Building2 className="w-8 h-8 text-primary" />
+              <Briefcase className="w-8 h-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">Welcome back</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight">DS Partners</CardTitle>
           <CardDescription>
-            Enter your credentials to access the dashboard
+            Clients Dashboards Access
           </CardDescription>
         </CardHeader>
         <CardContent>

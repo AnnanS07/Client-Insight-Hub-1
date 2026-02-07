@@ -2,6 +2,29 @@ import { nanoid } from "nanoid";
 
 export type ClientStatus = "Lead" | "Active" | "Inactive" | "Churned";
 
+export const CLIENT_SEGMENTS = [
+  "Salaried millennials in metro, Tier-1 cities",
+  "Salaried millennials in Tier-2+ cities",
+  "Salaried Gen Z",
+  "Salaried Gen X in Tier-1, Tier-2+ cities",
+  "Self-employed professionals",
+  "Gen Z student",
+  "Business owner",
+] as const;
+
+export type ClientSegment = typeof CLIENT_SEGMENTS[number];
+
+export const ASSET_CLASSES = [
+  "Stocks",
+  "Mutual Funds",
+  "Fixed Deposits (FD)",
+  "Bonds",
+  "PMS",
+  "AIF",
+] as const;
+
+export type AssetClass = typeof ASSET_CLASSES[number];
+
 export interface Client {
   id: string;
   name: string;
@@ -11,10 +34,38 @@ export interface Client {
   address: string;
   tags: string[];
   status: ClientStatus;
+  segment: ClientSegment;
   owner: string;
   notes: string;
   lastContact: string; // ISO date
   createdAt: string;
+  dematId?: string;
+}
+
+export interface Folio {
+  id: string;
+  clientId: string;
+  folioNumber: string;
+  provider: string; // Scheme/Provider
+  notes: string;
+}
+
+export interface Holding {
+  id: string;
+  clientId: string;
+  assetClass: AssetClass;
+  name: string; // Stock name, Fund name, etc.
+  purchaseDate: string;
+  units: number;
+  costPrice: number; // Cost per unit or total cost? Usually cost per unit or total investment. Let's assume Total Cost for simplicity in data entry or cost per unit. Let's do Total Cost for simplicity given the "manual" nature.
+  // wait, standard is units * avg cost. Let's ask for "Invested Amount" (Cost) and "Current Value" (derived from Price * Units).
+  // Request says: "store purchase date, units/quantity, cost, current NAV/price, and notes"
+  cost: number; // Total invested amount or price per unit? "cost" usually implies total cost basis or unit cost. Let's treat it as Total Invested Amount for simplicity, OR unit cost. Let's stick to "Cost Per Unit" to calculate total.
+  // Actually, "cost" usually means "Total Cost". But "NAV/Price" is per unit.
+  // Let's store: units, averageCostPerUnit, currentPrice.
+  averageCost: number;
+  currentPrice: number; // NAV or Price
+  notes: string;
 }
 
 export interface Task {
@@ -39,6 +90,8 @@ const STORAGE_KEYS = {
   CLIENTS: "mock_clients",
   TASKS: "mock_tasks",
   NOTES: "mock_notes",
+  FOLIOS: "mock_folios",
+  HOLDINGS: "mock_holdings",
 };
 
 // Initial Mock Data
@@ -52,10 +105,12 @@ const INITIAL_CLIENTS: Client[] = [
     address: "123 Tech Park, San Francisco, CA",
     tags: ["Enterprise", "High Value"],
     status: "Active",
+    segment: "Salaried millennials in metro, Tier-1 cities",
     owner: "admin",
     notes: "Key decision maker for Q3 expansion.",
     lastContact: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(), // 2 days ago
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 60).toISOString(),
+    dematId: "1203040000012345"
   },
   {
     id: "2",
@@ -66,6 +121,7 @@ const INITIAL_CLIENTS: Client[] = [
     address: "456 Eco Way, Austin, TX",
     tags: ["Sustainability", "Lead"],
     status: "Lead",
+    segment: "Business owner",
     owner: "staff",
     notes: "Interested in the basic plan.",
     lastContact: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
@@ -80,10 +136,12 @@ const INITIAL_CLIENTS: Client[] = [
     address: "789 Wall St, New York, NY",
     tags: ["Finance", "Risk"],
     status: "Active",
+    segment: "Salaried Gen X in Tier-1, Tier-2+ cities",
     owner: "admin",
     notes: "Renewal coming up in December.",
     lastContact: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 120).toISOString(),
+    dematId: "IN30012345678900"
   },
 ];
 
@@ -118,6 +176,53 @@ const INITIAL_NOTES: Note[] = [
   },
 ];
 
+// Seed some holdings for demo
+const INITIAL_HOLDINGS: Holding[] = [
+  {
+    id: "1",
+    clientId: "1",
+    assetClass: "Stocks",
+    name: "Reliance Industries",
+    purchaseDate: "2023-01-15",
+    units: 100,
+    averageCost: 2400,
+    currentPrice: 2800,
+    notes: "Long term hold",
+  },
+  {
+    id: "2",
+    clientId: "1",
+    assetClass: "Mutual Funds",
+    name: "HDFC Top 100",
+    purchaseDate: "2022-06-10",
+    units: 500,
+    averageCost: 450,
+    currentPrice: 580,
+    notes: "SIP",
+  },
+  {
+    id: "3",
+    clientId: "3",
+    assetClass: "Fixed Deposits (FD)",
+    name: "SBI FD",
+    purchaseDate: "2023-05-20",
+    units: 1,
+    averageCost: 100000,
+    currentPrice: 106000, // Accrued value
+    notes: "Emergency fund",
+  }
+];
+
+const INITIAL_FOLIOS: Folio[] = [
+    {
+        id: "1",
+        clientId: "1",
+        folioNumber: "12345/67",
+        provider: "HDFC Mutual Fund",
+        notes: "Primary MF"
+    }
+]
+
 // Helper to initialize data if empty
 const initData = () => {
   if (!localStorage.getItem(STORAGE_KEYS.CLIENTS)) {
@@ -128,6 +233,12 @@ const initData = () => {
   }
   if (!localStorage.getItem(STORAGE_KEYS.NOTES)) {
     localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(INITIAL_NOTES));
+  }
+  if (!localStorage.getItem(STORAGE_KEYS.HOLDINGS)) {
+    localStorage.setItem(STORAGE_KEYS.HOLDINGS, JSON.stringify(INITIAL_HOLDINGS));
+  }
+  if (!localStorage.getItem(STORAGE_KEYS.FOLIOS)) {
+    localStorage.setItem(STORAGE_KEYS.FOLIOS, JSON.stringify(INITIAL_FOLIOS));
   }
 };
 
@@ -200,5 +311,102 @@ export const mockDb = {
     const newNote = { ...note, id: nanoid(), createdAt: new Date().toISOString() };
     localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify([newNote, ...notes]));
     return newNote;
+  },
+
+  getFolios: (clientId: string): Folio[] => {
+    const folios: Folio[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.FOLIOS) || "[]");
+    return folios.filter((f) => f.clientId === clientId);
+  },
+  addFolio: (folio: Omit<Folio, "id">) => {
+    const folios: Folio[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.FOLIOS) || "[]");
+    const newFolio = { ...folio, id: nanoid() };
+    localStorage.setItem(STORAGE_KEYS.FOLIOS, JSON.stringify([...folios, newFolio]));
+    return newFolio;
+  },
+  deleteFolio: (id: string) => {
+    const folios: Folio[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.FOLIOS) || "[]");
+    localStorage.setItem(STORAGE_KEYS.FOLIOS, JSON.stringify(folios.filter((f) => f.id !== id)));
+  },
+
+  getHoldings: (clientId: string): Holding[] => {
+    const holdings: Holding[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.HOLDINGS) || "[]");
+    return holdings.filter((h) => h.clientId === clientId);
+  },
+  getAllHoldings: (): Holding[] => {
+      return JSON.parse(localStorage.getItem(STORAGE_KEYS.HOLDINGS) || "[]");
+  },
+  addHolding: (holding: Omit<Holding, "id">) => {
+    const holdings: Holding[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.HOLDINGS) || "[]");
+    const newHolding = { ...holding, id: nanoid() };
+    localStorage.setItem(STORAGE_KEYS.HOLDINGS, JSON.stringify([...holdings, newHolding]));
+    return newHolding;
+  },
+  updateHolding: (id: string, updates: Partial<Holding>) => {
+    const holdings: Holding[] = mockDb.getAllHoldings();
+    const index = holdings.findIndex((h) => h.id === id);
+    if (index !== -1) {
+      holdings[index] = { ...holdings[index], ...updates };
+      localStorage.setItem(STORAGE_KEYS.HOLDINGS, JSON.stringify(holdings));
+      return holdings[index];
+    }
+  },
+  deleteHolding: (id: string) => {
+    const holdings: Holding[] = mockDb.getAllHoldings();
+    localStorage.setItem(STORAGE_KEYS.HOLDINGS, JSON.stringify(holdings.filter((h) => h.id !== id)));
   }
 };
+
+// --- Financial Calculation Helpers ---
+
+// CAGR = (Current Value / Initial Value)^(1/n) - 1
+export function calculateCAGR(initialValue: number, currentValue: number, years: number): number {
+    if (initialValue <= 0 || years <= 0) return 0;
+    return (Math.pow(currentValue / initialValue, 1 / years) - 1) * 100;
+}
+
+// Simple XIRR approximation or placeholder. 
+// True XIRR requires iterative solving with cash flows. 
+// For this prototype, we'll assume a single cash flow at start (purchase) for simplicity in demo,
+// effectively making XIRR = CAGR for single lump sum.
+// Real XIRR would need a series of transactions which we aren't storing in detail yet (just holdings).
+export function calculateXIRR(initialValue: number, currentValue: number, days: number): number {
+     if (initialValue <= 0 || days <= 0) return 0;
+     const years = days / 365.25;
+     return (Math.pow(currentValue / initialValue, 1 / years) - 1) * 100;
+}
+
+export function getPortfolioSummary(holdings: Holding[]) {
+    let totalInvested = 0;
+    let totalCurrent = 0;
+    
+    // Group by Asset Class
+    const byAssetClass: Record<string, { invested: number, current: number }> = {};
+
+    holdings.forEach(h => {
+        const invested = h.units * h.averageCost;
+        const current = h.units * h.currentPrice;
+        
+        totalInvested += invested;
+        totalCurrent += current;
+
+        if (!byAssetClass[h.assetClass]) {
+            byAssetClass[h.assetClass] = { invested: 0, current: 0 };
+        }
+        byAssetClass[h.assetClass].invested += invested;
+        byAssetClass[h.assetClass].current += current;
+    });
+
+    // Approximate weighted CAGR based on individual holdings timeframes? 
+    // Or just simple aggregate return %? User asked for CAGR/XIRR.
+    // Without transaction history, we can only do simple Absolute Return or CAGR based on an "average" age or specific holding ages.
+    // We'll calculate CAGR per holding and then weight it, or just show Absolute Return for total.
+    // Let's stick to Absolute Return for the Summary for now to avoid misleading CAGR without dates.
+    // Actually, we have purchaseDate on holdings.
+    
+    return {
+        totalInvested,
+        totalCurrent,
+        byAssetClass,
+        holdingsCount: holdings.length
+    };
+}
