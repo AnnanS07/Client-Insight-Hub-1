@@ -1,51 +1,50 @@
+import path from "path";
+import { fileURLToPath } from "url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
-import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-import { metaImagesPlugin } from "./vite-plugin-meta-images";
+import { cartographer } from "@replit/vite-plugin-cartographer";
+import tailwindcss from "@tailwindcss/vite";
+import { createRequire } from "module";
 
-export default defineConfig({
-  plugins: [
-    react(),
-    runtimeErrorOverlay(),
-    tailwindcss(),
-    metaImagesPlugin(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
-  ],
-  resolve: {
-    alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
+
+// ✅ your repo name on GitHub
+const REPO_NAME = "Client-Insight-Hub-1";
+
+export default defineConfig(({ mode }) => {
+  const isProd = mode === "production";
+
+  return {
+    // Your React app is inside /client
+    root: path.resolve(__dirname, "client"),
+
+    // ✅ THIS is what fixes asset paths on GitHub Pages project sites:
+    // Site URL becomes: https://<user>.github.io/Client-Insight-Hub-1/
+    base: isProd ? `/${REPO_NAME}/` : "/",
+
+    plugins: [
+      react(),
+      tailwindcss(),
+      runtimeErrorOverlay(),
+
+      // Replit-only stuff should NOT run in production build
+      ...(isProd ? [] : [cartographer()]),
+    ],
+
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "client", "src"),
+        "@assets": path.resolve(__dirname, "client", "src", "assets"),
+      },
     },
-  },
-  css: {
-    postcss: {
-      plugins: [],
+
+    build: {
+      // your server build writes to dist/, so keep the SPA build in dist/public
+      outDir: path.resolve(__dirname, "dist", "public"),
+      emptyOutDir: true,
     },
-  },
-  root: path.resolve(import.meta.dirname, "client"),
-  build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
-    emptyOutDir: true,
-  },
-  server: {
-    host: "0.0.0.0",
-    allowedHosts: true,
-    fs: {
-      strict: true,
-      deny: ["**/.*"],
-    },
-  },
+  };
 });
