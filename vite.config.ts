@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
 
     build: {
       // your server build writes to dist/, so keep the SPA build in dist/public
-      outDir: path.resolve(__dirname, "dist", "public"),
+      outDir: path.resolve(__dirname, "dist"),
       emptyOutDir: true,
     },
   };
